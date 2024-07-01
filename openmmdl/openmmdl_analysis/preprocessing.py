@@ -5,10 +5,8 @@ import re
 import rdkit
 import mdtraj as md
 from rdkit import Chem
-from rdkit.Chem import Draw
-from rdkit.Chem import AllChem
+from rdkit.Chem import Draw, AllChem, SDWriter
 from rdkit.Chem.Draw import rdMolDraw2D
-from openbabel import pybel
 
 
 def renumber_protein_residues(input_pdb, reference_pdb, output_pdb):
@@ -97,27 +95,6 @@ def increase_ring_indices(ring, lig_index):
     return [atom_idx + lig_index for atom_idx in ring]
 
 
-def convert_ligand_to_smiles(input_sdf, output_smi):
-    """Converts ligand structures from an SDF file to SMILES :) format
-
-    Args:
-        input_sdf (str): Path to the SDF file with the ligand that wll be converted.
-        output_smi (str): Path to the output SMILES files.
-    """
-    # Create a molecule supplier from an SDF file
-    mol_supplier = Chem.SDMolSupplier(input_sdf)
-
-    # Open the output SMILES file for writing
-    with open(output_smi, "w") as output_file:
-        # Iterate through molecules and convert each to SMILES
-        for mol in mol_supplier:
-            if mol is not None:  # Make sure the molecule was successfully read
-                smiles = Chem.MolToSmiles(mol)
-                output_file.write(smiles + "\n")
-            else:
-                print("nono")
-
-
 def process_pdb_file(input_pdb_filename):
     """Process a PDB file to make it compatible with the openmmdl_analysis package.
 
@@ -159,17 +136,13 @@ def extract_and_save_ligand_as_sdf(input_pdb_filename, output_filename, target_r
         print(f"No ligand with residue name '{target_resname}' found in the PDB file.")
         return
 
-    # Create a new Universe with only the ligand
-    ligand_universe = mda.Merge(ligand_atoms)
+    #Using RDKit Converter to get SDF File
+    lig_atoms = ligand_atoms.convert_to("RDKIT")
 
-    # Save the ligand Universe as a PDB file
-    ligand_universe.atoms.write("lig.pdb")
-
-    # use openbabel to convert pdb to sdf
-    mol = next(pybel.readfile("pdb", "lig.pdb"))
-    mol.write("sdf", output_filename, overwrite=True)
-    # remove the temporary pdb file
-    os.remove("lig.pdb")
+    #Write out the SDF file
+    writer = SDWriter(output_filename)
+    writer.write(lig_atoms)
+    writer.close()
 
 
 def renumber_atoms_in_residues(input_pdb_file, output_pdb_file, lig_name):

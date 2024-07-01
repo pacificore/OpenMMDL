@@ -35,7 +35,6 @@ from openmmdl.openmmdl_analysis.preprocessing import (
     renumber_atoms_in_residues,
     process_pdb,
     extract_and_save_ligand_as_sdf,
-    convert_ligand_to_smiles,
 )
 from openmmdl.openmmdl_analysis.rmsd_calculation import (
     rmsd_for_atomgroups,
@@ -298,8 +297,8 @@ def main():
     print("\033[1mFiles are preprocessed\033[0m")
 
     if ligand_sdf == None:
-        extract_and_save_ligand_as_sdf(topology, "./lig.sdf", ligand)
-        ligand_sdf = "./lig.sdf"
+        extract_and_save_ligand_as_sdf(topology, "./ligand_prepared.sdf", ligand)
+        ligand_sdf = "./ligand_prepared.sdf"
 
     if not pdb_md:
         pdb_md = mda.Universe(topology, trajectory)
@@ -363,7 +362,6 @@ def main():
             ligand_rings.append(current_ring)
         print("\033[1mLigand ring data gathered\033[0m")
 
-        convert_ligand_to_smiles(ligand_sdf, output_smi="lig.smi")
     if peptide != None:
         ligand_rings = None
 
@@ -592,15 +590,10 @@ def main():
                 binding_site[binding_mode] = values
                 occurrence_count = top_10_nodes_with_occurrences[binding_mode]
                 occurrence_percent = 100 * occurrence_count / total_frames
-                with open("lig.smi", "r") as file:
-                    reference_smiles = (
-                        file.read().strip()
-                    )  # Read the SMILES from the file and remove any leading/trailing whitespace
-                reference_mol = Chem.MolFromSmiles(reference_smiles)
-                prepared_ligand = AllChem.AssignBondOrdersFromTemplate(
-                    reference_mol, lig_rd
-                )
-                # Generate 2D coordinates for the molecule
+                # Convert ligand to RDKit with Converter
+                lig_atoms = complex_lig.convert_to("RDKIT")
+                # Remove Hydrogens and get 2D representation
+                prepared_ligand = Chem.RemoveAllHs(lig_atoms)
                 AllChem.Compute2DCoords(prepared_ligand)
                 split_data = split_interaction_data(values)
                 # Get the highlighted atom indices based on interaction type
@@ -716,7 +709,7 @@ def main():
                 merged_image_paths, "all_binding_modes_arranged.png"
             )
             generate_ligand_image(
-                ligand, "complex.pdb", "lig_no_h.pdb", "lig.smi", f"ligand_numbering.svg"
+                ligand, "complex.pdb", "lig_no_h.pdb", f"ligand_numbering.svg"
             )
             if fig_type == "png":
                 cairosvg.svg2png(
